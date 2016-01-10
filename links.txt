@@ -1,0 +1,6 @@
+http://exploreembedded.com/wiki/LPC1768:_UART_Programming
+https://developer.mbed.org/platforms/mbed-LPC1768/
+https://github.com/Mrjohns42/RSL/tree/master/LPC1768/UART
+http://www.iana.org/assignments/telnet-options/telnet-options.xhtml
+http://book.itep.ru/4/45/tlnt_453.htm
+http://carpenoctem.das-lab.net/~cn/snapshotRepository130910/impera/CNDevices/eth2can/src/uip-0.9/doc/html/a00070.html
