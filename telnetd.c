@@ -38,22 +38,28 @@
 #define ISO_nl       0x0a
 #define ISO_cr       0x0d
 
-#define STATE_NORMAL 0
-#define STATE_IAC    1
-#define STATE_WILL   2
-#define STATE_WONT   3
-#define STATE_DO     4
-#define STATE_DONT   5
-#define STATE_CLOSE  6
+#define STATE_NORMAL 	0
+#define STATE_IAC    	1
+#define STATE_WILL   	2
+#define STATE_WONT   	3
+#define STATE_DO     	4
+#define STATE_DONT   	5
+#define STATE_CLOSE  	6
 
-#define TELNET_IAC   255
-#define TELNET_WILL  251
-#define TELNET_WONT  252
-#define TELNET_DO    253
-#define TELNET_DONT  254
+#define TELNET_SB		4
+#define TELNET_MODE_LINEMODE			34
+#define TELNET_MODE_LINEMODE_EDIT		1
+#define TELNET_MODE_LINEMODE_TRAPSIG	2
+
+#define TELNET_SE		240
+#define TELNET_WILL		251
+#define TELNET_WONT		252
+#define TELNET_DO		253
+#define TELNET_DONT		254
+#define TELNET_IAC		255
 
 /*    ,--------------------.
- *   /   Connection state  |
+ *   /    telnetState      |
  *  /   ,------------------'
  *  |  /  Action
  *  | -|--
@@ -61,12 +67,12 @@
  *  |  |  IAC WILL LINEMODE
  *  |  |  255 251  34
  *  | -|--
- *  |1.|  < Wait for >
+ *  |0.|  < Wait for >
  *  |  |  IAC DO  LINEMODE
  *  |  |  255 253 34
  *  |  |  [0] [1] [2]
  *  | -|--
- *  |2.|  < Send >
+ *  |3.|  < Send >
  *  |  |  IAC SB  LINEMODE EDIT 0 IAC SE
  *  |  |  255 250 34       1    0 255 240
  *  | -|--
@@ -75,220 +81,111 @@
  *  |  |  255 250 34       1    4     255 240
  *  |  |  [3] [4] [5]      [6]  [7]   [8] [9]
  *  | -|-- 
- *  |4.|  < Send >
+ *  |10.  < Send >
  *  |  |  IAC SB  LINEMODE TRAPSIG 0 IAC SE
  *  |  |  255 250 34       2       0 255 240
  *  | -|--
- *  |5.|  < Wait for >
+ *  |10.  < Wait for >
  *  |  |  IAC SB  LINEMODE TRAPSIG 0|ACK IAC SE
  *  |  |  255 250 34       2       4     255 240
- *   \/   [10][11][12]     [13]    [14]  [15][16]
+ *  |  |  [10][11][12]     [13]    [14]  [15][16]
+ *  | -|--
+ *  |17.  < Telnet setup complete >
+ *  | -|--
+ *  |128. < Connection established, idle >
+ *  | -|--
+ *  |129. < Connection established, tx data sent, waiting ack >
+ *  |  |
+ *   \/ 
+ * 
  */
 
-const u8_t rxExpected[] = {
+const u8_t rxExpectedCount = 17, rxExpected[] = {
 	255, 253, 34,
 	255, 250, 34, 1, 4, 255, 240,
 	255, 250, 34, 2, 4, 255, 240
-}
-u8_t telnetState = 0;
+};
+u8_t telnetState = 0, rxExpectedByte = 0;
 
-/*---------------------------------------------------------------------------*/
-void telnetd_init(void)
-{
-  uip_listen(HTONS(23));
-  memb_init(&linemem);
-  shell_init();
+struct txDataType {
+	u8_t data[TCPTXBUFSIZE];
+	u8_t length;
+} txData;
+
+void telnetd_init(void) {
+	uip_listen(HTONS(23));
+	memb_init(&linemem);
+	shell_init();
 }
-/*---------------------------------------------------------------------------*/
-static void
-senddata(void)
-{
-  static char *bufptr, *lineptr;
-  static int buflen, linelen;
-  
-  bufptr = uip_appdata;
-  buflen = 0;
-  for(s.numsent = 0; s.numsent < TELNETD_CONF_NUMLINES &&
-	s.lines[s.numsent] != NULL ; ++s.numsent) {
-    lineptr = s.lines[s.numsent];
-    linelen = strlen(lineptr);
-    if(linelen > TELNETD_CONF_LINELEN) {
-      linelen = TELNETD_CONF_LINELEN;
-    }
-    if(buflen + linelen < uip_mss()) {
-      memcpy(bufptr, lineptr, linelen);
-      bufptr += linelen;
-      buflen += linelen;
-    } else {
-      break;
-    }
-  }
-  uip_send(uip_appdata, buflen);
+
+void connClosed() {
+	telnetState = 0;
 }
-/*---------------------------------------------------------------------------*/
-static void
-closed(void)
-{
-  static unsigned int i;
-  
-  for(i = 0; i < TELNETD_CONF_NUMLINES; ++i) {
-    if(s.lines[i] != NULL) {
-      dealloc_line(s.lines[i]);
-    }
-  }
-}
-/*---------------------------------------------------------------------------*/
-static void
-get_char(u8_t c)
-{
-  if(c == ISO_cr) {
-    return;
-  }
-  
-  s.buf[(int)s.bufptr] = c;
-  if(s.buf[(int)s.bufptr] == ISO_nl ||
-     s.bufptr == sizeof(s.buf) - 1) {
-    if(s.bufptr > 0) {
-      s.buf[(int)s.bufptr] = 0;
-      /*      petsciiconv_topetscii(s.buf, TELNETD_CONF_LINELEN);*/
-    }
-    shell_input(s.buf);
-    s.bufptr = 0;
-  } else {
-    ++s.bufptr;
-  }
-}
-/*---------------------------------------------------------------------------*/
-static void
-sendopt(u8_t option, u8_t value)
-{
-  char *line;
-  line = alloc_line();
-  if(line != NULL) {
-    line[0] = TELNET_IAC;
-    line[1] = option;
-    line[2] = value;
-    line[3] = 0;
-    sendline(line);
-  }
-}
-/*---------------------------------------------------------------------------*/
-static void
-newdata(void)
-{
-  u16_t len;
-  u8_t c;
-  char *dataptr;
-    
-  
-  len = uip_datalen();
-  dataptr = (char *)uip_appdata;
-  
-  while(len > 0 && s.bufptr < sizeof(s.buf)) {
-    c = *dataptr;
-    ++dataptr;
-    --len;
-    switch(s.state) {
-    case STATE_IAC:
-      if(c == TELNET_IAC) {
-	get_char(c);
-	s.state = STATE_NORMAL;
-      } else {
-	switch(c) {
-	case TELNET_WILL:
-	  s.state = STATE_WILL;
-	  break;
-	case TELNET_WONT:
-	  s.state = STATE_WONT;
-	  break;
-	case TELNET_DO:
-	  s.state = STATE_DO;
-	  break;
-	case TELNET_DONT:
-	  s.state = STATE_DONT;
-	  break;
-	default:
-	  s.state = STATE_NORMAL;
-	  break;
+
+void telnetd_appcall(void) {
+	if(uip_connected()) {
+		// new connection
+		// telnet setup
+		telnetState = 0;
+		txData.data = { TELNET_IAC, TELNET_WILL, TELNET_MODE_LINEMODE };
+		txData.length = 3;
+		uip_send( txData.data, txData.length );
 	}
-      }
-      break;
-    case STATE_WILL:
-      /* Reply with a DONT */
-      sendopt(TELNET_DONT, c);
-      s.state = STATE_NORMAL;
-      break;
-      
-    case STATE_WONT:
-      /* Reply with a DONT */
-      sendopt(TELNET_DONT, c);
-      s.state = STATE_NORMAL;
-      break;
-    case STATE_DO:
-      /* Reply with a WONT */
-      sendopt(TELNET_WONT, c);
-      s.state = STATE_NORMAL;
-      break;
-    case STATE_DONT:
-      /* Reply with a WONT */
-      sendopt(TELNET_WONT, c);
-      s.state = STATE_NORMAL;
-      break;
-    case STATE_NORMAL:
-      if(c == TELNET_IAC) {
-	s.state = STATE_IAC;
-      } else {
-	get_char(c);
-      }
-      break;
-    }
-
-    
-  }
-  
+	
+	if(uip_closed() ||
+		 uip_aborted() ||
+		 uip_timedout()) {
+		connClosed();
+	}
+	
+	if(uip_acked()) {
+		if( telnetState == 129 ) {
+			telnetState = 128; // tcp ack
+		}
+	}
+	
+	if(uip_newdata()) {
+		u8_t rxDataByte, rxDataLength = uip_datalen();
+		if( telnetState & 128 ) {
+			// connection is good, pass recieved data to UART
+			UART0PushSend( uip_appdata, uip_datalen() );
+		}
+		else {
+			for( rxDataByte = 0; rxDataByte < rxDataLength && telnetState < rxExpectedCount; ) {
+				if( uip_appdata[rxDataByte++] != rxExpected[telnetState] ) {
+					// unexpected answer, client does not support tis mode
+					telnetState = 0;
+					uip_close();
+					connClosed();
+					return;
+				}
+			}
+			if( telnetState == rxExpectedCount ) {
+				// telnet setup completed
+				telnetState = 128; // state: idle
+				return;
+			}
+			switch( telnetState ) {
+				case 0:
+					txData.data = { TELNET_IAC, TELNET_WILL, TELNET_MODE_LINEMODE };
+					txData.length = 3;
+					uip_send( txData.data, txData.length );
+					break;
+				case 3:
+					txData.data = { TELNET_IAC, TELNET_SB, TELNET_MODE_LINEMODE, TELNET_MODE_LINEMODE_EDIT, 0, TELNET_IAC, TELNET_SE };
+					txData.length = 7;
+					uip_send( txData.data, txData.length );
+					break;
+				case 10:
+					txData.data = { TELNET_IAC, TELNET_SB, TELNET_MODE_LINEMODE, TELNET_MODE_LINEMODE_TRAPSIG, 0, TELNET_IAC, TELNET_SE };
+					txData.length = 7;
+					uip_send( txData.data, txData.length );
+					break;
+			}
+		}
+	}
+	
+	if( uip_rexmit() ) {
+		uip_send( txData.data, txData.length );
+	}
 }
-/*---------------------------------------------------------------------------*/
-void
-telnetd_appcall(void)
-{
-  static unsigned int i;
-  if(uip_connected()) {
-    /*    tcp_markconn(uip_conn, &s);*/
-    for(i = 0; i < TELNETD_CONF_NUMLINES; ++i) {
-      s.lines[i] = NULL;
-    }
-    s.bufptr = 0;
-    s.state = STATE_NORMAL;
-
-    shell_start();
-  }
-
-  if(s.state == STATE_CLOSE) {
-    s.state = STATE_NORMAL;
-    uip_close();
-    return;
-  }
-  
-  if(uip_closed() ||
-     uip_aborted() ||
-     uip_timedout()) {
-    closed();
-  }
-  
-  if(uip_acked()) {
-    acked();
-  }
-  
-  if(uip_newdata()) {
-    newdata();
-  }
-  
-  if(uip_rexmit() ||
-     uip_newdata() ||
-     uip_acked() ||
-     uip_connected() ||
-     uip_poll()) {
-    senddata();
-  }
-}
-/*---------------------------------------------------------------------------*/

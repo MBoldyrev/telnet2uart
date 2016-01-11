@@ -1,5 +1,13 @@
+/**
+ * \file
+ * Various uIP library functions.
+ * \author
+ * Adam Dunkels <adam@sics.se>
+ *
+ */
+
 /*
- * Copyright (c) 2003, Adam Dunkels.
+ * Copyright (c) 2002, Adam Dunkels.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,20 +37,35 @@
  *
  * This file is part of the uIP TCP/IP stack
  *
- * $Id: telnetd.h,v 1.2 2006/06/07 09:43:54 adam Exp $
+ * $Id: uiplib.h,v 1.1 2006/06/07 09:15:19 adam Exp $
  *
  */
-#ifndef __TELNETD_H__
-#define __TELNETD_H__
+#ifndef __UIPLIB_H__
+#define __UIPLIB_H__
 
-#include "uipopt.h"
+/**
+ * \addtogroup uipconvfunc
+ * @{
+ */
 
-void telnetd_appcall(void);
+/**
+ * Convert a textual representation of an IP address to a numerical representation.
+ *
+ * This function takes a textual representation of an IP address in
+ * the form a.b.c.d and converts it into a 4-byte array that can be
+ * used by other uIP functions.
+ *
+ * \param addrstr A pointer to a string containing the IP address in
+ * textual form.
+ *
+ * \param addr A pointer to a 4-byte array that will be filled in with
+ * the numerical representation of the address.
+ *
+ * \retval 0 If the IP address could not be parsed.
+ * \retval Non-zero If the IP address was parsed.
+ */
+unsigned char uiplib_ipaddrconv(char *addrstr, unsigned char *addr);
 
-#ifndef UIP_APPCALL
-#define UIP_APPCALL     telnetd_appcall
-#endif
+/** @} */
 
-#define TCPTXBUFSIZE 7
-
-#endif /* __TELNETD_H__ */
+#endif /* __UIPLIB_H__ */
