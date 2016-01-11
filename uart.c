@@ -1,25 +1,27 @@
-#include "lpc17xx.h"
+#include "LPC17xx.h"
 #include "type.h"
 #include "uart.h"
 
 volatile uint32_t UART0Status;
 uint8_t UART0SendBuffer[TXBUFSIZE], UART0RecvBuffer[RXBUFSIZE];
-const uint8_t txBufEnd = UART0SendBuffer + TXBUFSIZE, rxBufEnd = UART0RecvBuffer + RXBUFSIZE; // rxBufThreshold = RXBUFSIZE * 3 / 4;
-volatile uint8_t *UART0RBTail = UART0RecvBuffer, *UART0SBHead = UART0SendBuffer, *UART0SBTail = UART0SendBuffer, UART0SBEmpty = 1, UART0RBEmpty = 1;
+const uint8_t *txBufEnd = UART0SendBuffer + TXBUFSIZE, *rxBufEnd = UART0RecvBuffer + RXBUFSIZE;
+volatile uint8_t *UART0RBTail = UART0RecvBuffer, *UART0SBHead = UART0SendBuffer,
+                 *UART0SBTail = UART0SendBuffer, UART0SBEmpty = 1, UART0RBEmpty = 1;
 
 void UART0PushSend( uint8_t *data, uint16_t length ) {
+	uint16_t pos = 0;
 	while( UART0SBHead != UART0SBTail || UART0SBEmpty ) {
 		// UART0SendBuffer not full
 		UART0SBEmpty = 0;
 		*UART0SBTail++ = data[pos++];
-		if( length-- == 0 ) {
+		if( pos == length ) {
 			break;
 		}
 	}
 	LPC_UART0->IER |= IER_THRE;
 }
 
-uint32_t UARTInit( uint32_t baudrate ) {
+uint32_t UART0Init() {
 	uint32_t Fdiv;
 	uint32_t pclkdiv, pclk;
 
@@ -45,7 +47,7 @@ uint32_t UARTInit( uint32_t baudrate ) {
 	}
 
 	LPC_UART0->LCR = 0x03;			/* 8 bits, no parity, 1 stop bit */
-	Fdiv = ( pclk / 16 ) / baudrate ;		/* baud rate */
+	Fdiv = ( pclk / 16 ) / UART0BAUDRATE;		/* baud rate */
 	LPC_UART0->DLM = Fdiv / 256;								
 	LPC_UART0->DLL = Fdiv % 256;
 	LPC_UART0->LCR = 0x03;			/* DLAB = 0 */

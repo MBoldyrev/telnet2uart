@@ -19,9 +19,10 @@
 #define LSR_RXFE	0x80
 #define RXBUFSIZE	0x40
 #define TXBUFSIZE	0x40
+#define UART0BAUDRATE	19200
 
-uint32_t UARTInit( uint32_t baudrate );
+uint32_t UART0Init();
 void UART0_IRQHandler();
-void UARTSend( uint8_t *bufferPtr, uint32_t length );
+void UART0PushSend( uint8_t *data, uint16_t length );
 
 #endif /* end __UART_H */

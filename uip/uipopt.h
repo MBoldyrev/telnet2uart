@@ -526,6 +526,8 @@ typedef struct httpd_state uip_tcp_appstate_t
  * application state information.
  */
 
+typedef uint8_t uip_tcp_appstate_t;
+
 /**
  * \var typedef uip_udp_appstate_t
  *

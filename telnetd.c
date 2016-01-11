@@ -1,39 +1,6 @@
-/*
- * Copyright (c) 2003, Adam Dunkels.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote
- *    products derived from this software without specific prior
- *    written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * This file is part of the uIP TCP/IP stack
- *
- * $Id: telnetd.c,v 1.2 2006/06/07 09:43:54 adam Exp $
- *
- */
-
-#include "uip.h"
+#include "uip/uip.h"
 #include "telnetd.h"
+#include "uart.h"
 
 #define ISO_nl       0x0a
 #define ISO_cr       0x0d
@@ -112,12 +79,6 @@ struct txDataType {
 	u8_t length;
 } txData;
 
-void telnetd_init(void) {
-	uip_listen(HTONS(23));
-	memb_init(&linemem);
-	shell_init();
-}
-
 void connClosed() {
 	telnetState = 0;
 }
@@ -127,14 +88,16 @@ void telnetd_appcall(void) {
 		// new connection
 		// telnet setup
 		telnetState = 0;
-		txData.data = { TELNET_IAC, TELNET_WILL, TELNET_MODE_LINEMODE };
+		txData.data[0] = TELNET_IAC;
+		txData.data[1] = TELNET_WILL;
+		txData.data[2] = TELNET_MODE_LINEMODE;
 		txData.length = 3;
 		uip_send( txData.data, txData.length );
 	}
 	
 	if(uip_closed() ||
-		 uip_aborted() ||
-		 uip_timedout()) {
+		uip_aborted() ||
+		uip_timedout()) {
 		connClosed();
 	}
 	
@@ -152,7 +115,7 @@ void telnetd_appcall(void) {
 		}
 		else {
 			for( rxDataByte = 0; rxDataByte < rxDataLength && telnetState < rxExpectedCount; ) {
-				if( uip_appdata[rxDataByte++] != rxExpected[telnetState] ) {
+				if( ((uint8_t*)uip_appdata)[rxDataByte++] != rxExpected[telnetState] ) {
 					// unexpected answer, client does not support tis mode
 					telnetState = 0;
 					uip_close();
@@ -167,17 +130,31 @@ void telnetd_appcall(void) {
 			}
 			switch( telnetState ) {
 				case 0:
-					txData.data = { TELNET_IAC, TELNET_WILL, TELNET_MODE_LINEMODE };
+					txData.data[0] = TELNET_IAC;
+					txData.data[1] = TELNET_WILL;
+					txData.data[2] = TELNET_MODE_LINEMODE;
 					txData.length = 3;
 					uip_send( txData.data, txData.length );
 					break;
 				case 3:
-					txData.data = { TELNET_IAC, TELNET_SB, TELNET_MODE_LINEMODE, TELNET_MODE_LINEMODE_EDIT, 0, TELNET_IAC, TELNET_SE };
+					txData.data[0] = TELNET_IAC;
+					txData.data[1] = TELNET_SB;
+					txData.data[2] = TELNET_MODE_LINEMODE;
+					txData.data[3] = TELNET_MODE_LINEMODE_EDIT;
+					txData.data[4] = 0;
+					txData.data[5] = TELNET_IAC;
+					txData.data[6] = TELNET_SE;
 					txData.length = 7;
 					uip_send( txData.data, txData.length );
 					break;
 				case 10:
-					txData.data = { TELNET_IAC, TELNET_SB, TELNET_MODE_LINEMODE, TELNET_MODE_LINEMODE_TRAPSIG, 0, TELNET_IAC, TELNET_SE };
+					txData.data[0] = TELNET_IAC;
+					txData.data[1] = TELNET_SB;
+					txData.data[2] = TELNET_MODE_LINEMODE;
+					txData.data[3] = TELNET_MODE_LINEMODE_TRAPSIG;
+					txData.data[4] = 0;
+					txData.data[5] = TELNET_IAC;
+					txData.data[6] = TELNET_SE;
 					txData.length = 7;
 					uip_send( txData.data, txData.length );
 					break;
