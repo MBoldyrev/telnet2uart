@@ -11,5 +11,10 @@ void telnetd_appcall(void);
 #endif
 
 #define TCPTXBUFSIZE 7
+struct txDataType {
+	u8_t data[TCPTXBUFSIZE];
+	u8_t length;
+} txData;
+
 
 #endif /* __TELNETD_H__ */

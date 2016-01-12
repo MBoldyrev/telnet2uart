@@ -82,23 +82,15 @@ void UART0_IRQHandler() {
 			// Receive Data Ready
 			// If no error on RLS, normal ready, save into the data buffer. 
 			// Note: read RBR will clear the interrupt 
-			if ( UART0RBTail != rxBufEnd ) { // buffer not full
-				*UART0RBTail = LPC_UART0->RBR;
-				UART0RBTail++;
-			}
-			else {
-				// send
+			if ( txData.length != (uint16_t)0xFFFF ) { // buffer not full
+				txData.data[txData.length++] = LPC_UART0->RBR;
 			}
 		}
 	}
 	else if ( IIRValue == IIR_RDA ) {	
 		// Receive Data Available 
-		if ( UART0RBTail != rxBufEnd ) { // buffer not full
-			*UART0RBTail = LPC_UART0->RBR;
-			UART0RBTail++;
-		}
-		else {
-			// send
+		if ( txData.length != (uint16_t)0xFFFF ) { // buffer not full
+			txData.data[txData.length++] = LPC_UART0->RBR;
 		}
 	}
 	else if ( IIRValue == IIR_CTI ) {	

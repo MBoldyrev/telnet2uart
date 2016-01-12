@@ -74,15 +74,6 @@ const u8_t rxExpectedCount = 17, rxExpected[] = {
 };
 u8_t telnetState = 0, rxExpectedByte = 0;
 
-struct txDataType {
-	u8_t data[TCPTXBUFSIZE];
-	u8_t length;
-} txData;
-
-void connClosed() {
-	telnetState = 0;
-}
-
 void telnetd_appcall(void) {
 	if(uip_connected()) {
 		// new connection
@@ -98,11 +89,13 @@ void telnetd_appcall(void) {
 	if(uip_closed() ||
 		uip_aborted() ||
 		uip_timedout()) {
-		connClosed();
+		telnetState = 0;
+		txData.length = 0;
 	}
 	
 	if(uip_acked()) {
 		if( telnetState == 129 ) {
+			txData.length = 0;
 			telnetState = 128; // tcp ack
 		}
 	}
