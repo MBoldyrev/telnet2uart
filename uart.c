@@ -3,9 +3,9 @@
 #include "uart.h"
 
 volatile uint32_t UART0Status;
-uint8_t UART0SendBuffer[TXBUFSIZE], UART0RecvBuffer[RXBUFSIZE];
-const uint8_t *txBufEnd = UART0SendBuffer + TXBUFSIZE, *rxBufEnd = UART0RecvBuffer + RXBUFSIZE;
-volatile uint8_t *UART0RBTail = UART0RecvBuffer, *UART0SBHead = UART0SendBuffer,
+uint8_t UART0SendBuffer[TXBUFSIZE];
+const uint8_t *txBufEnd = UART0SendBuffer + TXBUFSIZE;
+volatile uint8_t *UART0SBHead = UART0SendBuffer,
                  *UART0SBTail = UART0SendBuffer, UART0SBEmpty = 1, UART0RBEmpty = 1;
 
 void UART0PushSend( uint8_t *data, uint16_t length ) {
