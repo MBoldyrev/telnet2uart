@@ -75,7 +75,7 @@ void UART0_IRQHandler() {
 			// There are errors or break interrupt 
 			// Read LSR will clear the interrupt 
 			UART0Status = LSRValue;
-			uint8_t dummy = LPC_UART0->RBR;		// Dummy read on RX to clear interrupt, then bail out 
+			uint8_t dummy = LPC_UART0->RBR;		// Dummy read on RX to clear interrupt
 			return;
 		}
 		if ( LSRValue & LSR_RDR ) {	
@@ -84,6 +84,7 @@ void UART0_IRQHandler() {
 			// Note: read RBR will clear the interrupt 
 			if ( txData.length != (uint16_t)0xFFFF ) { // buffer not full
 				txData.data[txData.length++] = LPC_UART0->RBR;
+				uip_send( txData.data, txData.length );
 			}
 		}
 	}
@@ -91,6 +92,7 @@ void UART0_IRQHandler() {
 		// Receive Data Available 
 		if ( txData.length != (uint16_t)0xFFFF ) { // buffer not full
 			txData.data[txData.length++] = LPC_UART0->RBR;
+			uip_send( txData.data, txData.length );
 		}
 	}
 	else if ( IIRValue == IIR_CTI ) {	
@@ -109,6 +111,7 @@ void UART0_IRQHandler() {
 			}
 			else {
 				UART0SBEmpty = 1;
+				LPC_UART0->IER &= ~IER_THRE;
 			}
 		}
 	}

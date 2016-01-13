@@ -2,7 +2,8 @@
 #include "uip/uip_arp.h"
 #include "uip/httpd.h"
 #include "uip/timer.h"
-#include "network-device.h"
+#include "lpc17xx_emac.h"
+#include "lpc_phy.h"
 #include "uart.h"
 
 /*---------------------------------------------------------------------------*/
@@ -15,7 +16,8 @@ main(void)
   
   timer_set(&periodic_timer, CLOCK_SECOND / 2);
   
-  network_device_init();
+  EMAC_Init();
+  lpc_phy_init();
   uip_init();
 
   uip_ipaddr(ipaddr, 192,168,0,55);
@@ -25,14 +27,14 @@ main(void)
   uip_listen(HTONS(23));
   
   while(1) {
-    uip_len = network_device_read();
+    uip_len = EMAC_ReadPacket( uip_buf );
     if(uip_len > 0) {
       uip_input();
       /* If the above function invocation resulted in data that
  *          should be sent out on the network, the global variable
  *                   uip_len is set to a value > 0. */
       if(uip_len > 0) {
-        network_device_send();
+        EMAC_SendPacket( uip_buf, uip_len );
       }
     } else if(timer_expired(&periodic_timer)) {
       timer_reset(&periodic_timer);
@@ -42,7 +44,7 @@ main(void)
  *            should be sent out on the network, the global variable
  *                       uip_len is set to a value > 0. */
         if(uip_len > 0) {
-          network_device_send();
+          EMAC_SendPacket( uip_buf, uip_len );
         }
       }
     }
