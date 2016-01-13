@@ -4,7 +4,7 @@
 
 volatile uint32_t UART0Status;
 uint8_t UART0SendBuffer[TXBUFSIZE];
-const uint8_t *txBufEnd = UART0SendBuffer + TXBUFSIZE;
+const uint8_t *UART0SBEnd = UART0SendBuffer + TXBUFSIZE;
 volatile uint8_t *UART0SBHead = UART0SendBuffer,
                  *UART0SBTail = UART0SendBuffer, UART0SBEmpty = 1, UART0RBEmpty = 1;
 
@@ -14,6 +14,8 @@ void UART0PushSend( uint8_t *data, uint16_t length ) {
 		// UART0SendBuffer not full
 		UART0SBEmpty = 0;
 		*UART0SBTail++ = data[pos++];
+		if( UART0SBTail == UART0SBEnd )
+			UART0SBTail = UART0SendBuffer;
 		if( pos == length ) {
 			break;
 		}
@@ -21,7 +23,7 @@ void UART0PushSend( uint8_t *data, uint16_t length ) {
 	LPC_UART0->IER |= IER_THRE;
 }
 
-uint32_t UART0Init() {
+void UART0Init() {
 	uint32_t Fdiv;
 	uint32_t pclkdiv, pclk;
 
@@ -46,7 +48,7 @@ uint32_t UART0Init() {
 			break;
 	}
 
-	LPC_UART0->LCR = 0x03;			/* 8 bits, no parity, 1 stop bit */
+	LPC_UART0->LCR = 0x83;			/* 8 bits, no parity, 1 stop bit */
 	Fdiv = ( pclk / 16 ) / UART0BAUDRATE;		/* baud rate */
 	LPC_UART0->DLM = Fdiv / 256;								
 	LPC_UART0->DLL = Fdiv % 256;
@@ -55,8 +57,6 @@ uint32_t UART0Init() {
 
 	NVIC_EnableIRQ(UART0_IRQn);
 	LPC_UART0->IER = IER_RBR | IER_THRE | IER_RLS;		/* Enable UART0 interrupt */
-
-	return (TRUE);
 }
 
 void UART0_IRQHandler() {
@@ -104,9 +104,9 @@ void UART0_IRQHandler() {
 		uint8_t LSRValue = LPC_UART0->LSR;		
 		if ( LSRValue & LSR_THRE ) {
 			if ( UART0SBTail != UART0SBHead ) { // Transmit FIFO not empty
-				LPC_UART1->THR = *UART0SBTail++;
-				if( UART0SBTail == txBufEnd ) {
-					UART0SBTail = UART0SendBuffer;
+				LPC_UART1->THR = *UART0SBHead++;
+				if( UART0SBHead == UART0SBEnd ) {
+					UART0SBHead = UART0SendBuffer;
 				}
 			}
 			else {

@@ -59,9 +59,7 @@
  *  | -|--
  *  |17.  < Telnet setup complete >
  *  | -|--
- *  |128. < Connection established, idle >
- *  | -|--
- *  |129. < Connection established, tx data sent, waiting ack >
+ *  |128. < Connection established >
  *  |  |
  *   \/ 
  * 
@@ -94,23 +92,25 @@ void telnetd_appcall(void) {
 	}
 	
 	if(uip_acked()) {
-		if( telnetState == 129 ) {
-			txData.length = 0;
-			telnetState = 128; // tcp ack
-		}
+		txData.length = 0;
 	}
 	
 	if(uip_newdata()) {
-		u8_t rxDataByte, rxDataLength = uip_datalen();
 		if( telnetState & 128 ) {
 			// connection is good, pass recieved data to UART
 			UART0PushSend( uip_appdata, uip_datalen() );
 		}
 		else {
+			u8_t rxDataByte, rxDataLength = uip_datalen();
 			for( rxDataByte = 0; rxDataByte < rxDataLength && telnetState < rxExpectedCount; ) {
 				if( ((uint8_t*)uip_appdata)[rxDataByte++] != rxExpected[telnetState] ) {
 					// unexpected answer, client does not support tis mode
-					telnetState = 0;
+					if( telnetState < 17 )
+						telnetState = 10;
+					if( telnetState < 10 )
+						telnetState = 3;
+					if( telnetState < 3 )
+						telnetState = 0;
 					uip_close();
 					connClosed();
 					return;
@@ -118,7 +118,7 @@ void telnetd_appcall(void) {
 			}
 			if( telnetState == rxExpectedCount ) {
 				// telnet setup completed
-				telnetState = 128; // state: idle
+				telnetState = 128;
 				return;
 			}
 			switch( telnetState ) {
